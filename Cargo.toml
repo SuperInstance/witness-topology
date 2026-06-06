@@ -1,0 +1,14 @@
+[package]
+name = "witness-topology"
+version = "0.1.0"
+edition = "2024"
+description = "Topological data analysis for agent behavior verification using witness complexes"
+license = "MIT"
+repository = "https://github.com/SuperInstance/witness-topology"
+keywords = ["topology", "tda", "witness-complex", "persistent-homology", "agent"]
+categories = ["mathematics", "science"]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
