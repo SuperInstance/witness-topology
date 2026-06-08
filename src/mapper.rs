@@ -4,7 +4,7 @@
 //! bin the resulting values, cluster within overlapping bins, and build a graph
 //! connecting overlapping clusters.
 
-use crate::{PointCloud, MapperGraph};
+use crate::{MapperGraph, PointCloud};
 
 /// Configuration for Mapper graph construction.
 #[derive(Debug, Clone)]
@@ -32,11 +32,7 @@ impl Default for MapperConfig {
 /// The filter function maps each point to a scalar value. Points are binned
 /// by filter value into overlapping intervals, clustered within each interval,
 /// and connected if clusters share points.
-pub fn build_mapper_graph<F>(
-    cloud: &PointCloud,
-    filter_fn: F,
-    config: &MapperConfig,
-) -> MapperGraph
+pub fn build_mapper_graph<F>(cloud: &PointCloud, filter_fn: F, config: &MapperConfig) -> MapperGraph
 where
     F: Fn(&[f64]) -> f64,
 {
@@ -49,7 +45,10 @@ where
     let filter_values: Vec<f64> = cloud.points.iter().map(|p| filter_fn(p)).collect();
 
     let f_min = filter_values.iter().cloned().fold(f64::INFINITY, f64::min);
-    let f_max = filter_values.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+    let f_max = filter_values
+        .iter()
+        .cloned()
+        .fold(f64::NEG_INFINITY, f64::max);
 
     if (f_max - f_min).abs() < 1e-15 {
         // All points have same filter value
@@ -58,7 +57,8 @@ where
     }
 
     // Create overlapping intervals
-    let interval_width = (f_max - f_min) / (config.num_intervals as f64 * (1.0 - config.overlap) + config.overlap);
+    let interval_width =
+        (f_max - f_min) / (config.num_intervals as f64 * (1.0 - config.overlap) + config.overlap);
     let step = interval_width * (1.0 - config.overlap);
 
     let mut intervals: Vec<(f64, f64)> = Vec::new();
@@ -98,10 +98,10 @@ where
     for i in 0..num_clusters {
         for j in (i + 1)..num_clusters {
             // Only check clusters from overlapping intervals
-            let interval_diff = (cluster_interval[i] as i64 - cluster_interval[j] as i64).unsigned_abs();
+            let interval_diff =
+                (cluster_interval[i] as i64 - cluster_interval[j] as i64).unsigned_abs();
             if interval_diff <= 1 {
-                let shared = all_clusters[i].iter()
-                    .any(|p| all_clusters[j].contains(p));
+                let shared = all_clusters[i].iter().any(|p| all_clusters[j].contains(p));
                 if shared {
                     edges.push((i, j));
                 }
@@ -170,7 +170,11 @@ pub fn mapper_graph_first_coord(cloud: &PointCloud, config: &MapperConfig) -> Ma
 
 /// Convenience: build a Mapper graph using L2 norm as filter.
 pub fn mapper_graph_norm(cloud: &PointCloud, config: &MapperConfig) -> MapperGraph {
-    build_mapper_graph(cloud, |p| p.iter().map(|x| x * x).sum::<f64>().sqrt(), config)
+    build_mapper_graph(
+        cloud,
+        |p| p.iter().map(|x| x * x).sum::<f64>().sqrt(),
+        config,
+    )
 }
 
 #[cfg(test)]

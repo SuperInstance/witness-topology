@@ -4,8 +4,8 @@
 //! point cloud produce proportionally bounded changes in persistence diagrams.
 
 use crate::PointCloud;
-use crate::persistence::rips_persistence;
 use crate::bottleneck::bottleneck_distance;
+use crate::persistence::rips_persistence;
 
 /// Result of a stability analysis.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -26,17 +26,25 @@ pub struct StabilityResult {
 pub fn perturb_point_cloud(cloud: &PointCloud, noise_level: f64, seed: u64) -> PointCloud {
     let mut state = seed;
     let mut rng = || {
-        state = state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        state = state
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         let x = (state >> 33) as i32 as f64 / (i32::MAX as f64);
         x // returns value in [-1, 1]
     };
 
-    let points = cloud.points.iter().map(|p| {
-        p.iter().map(|&coord| {
-            let noise = rng() * noise_level;
-            coord + noise
-        }).collect()
-    }).collect();
+    let points = cloud
+        .points
+        .iter()
+        .map(|p| {
+            p.iter()
+                .map(|&coord| {
+                    let noise = rng() * noise_level;
+                    coord + noise
+                })
+                .collect()
+        })
+        .collect();
 
     PointCloud::from_points(points)
 }
@@ -92,7 +100,11 @@ pub fn check_stability(
 ///
 /// d_H(X, Y) = max(sup_x inf_y d(x,y), sup_y inf_x d(x,y))
 pub fn hausdorff_distance(cloud1: &PointCloud, cloud2: &PointCloud) -> f64 {
-    assert_eq!(cloud1.len(), cloud2.len(), "point clouds must have same number of points for direct comparison");
+    assert_eq!(
+        cloud1.len(),
+        cloud2.len(),
+        "point clouds must have same number of points for direct comparison"
+    );
 
     let n = cloud1.len();
     let mut max_min_12: f64 = 0.0;
@@ -102,8 +114,12 @@ pub fn hausdorff_distance(cloud1: &PointCloud, cloud2: &PointCloud) -> f64 {
     for i in 0..n {
         let _d = cloud1.distance(i, i); // This is 0 for self, we want cross-cloud
         // Actually compute between cloud1[i] and cloud2[i]
-        let d = cloud1.points[i].iter().zip(cloud2.points[i].iter())
-            .map(|(a, b)| (a - b).powi(2)).sum::<f64>().sqrt();
+        let d = cloud1.points[i]
+            .iter()
+            .zip(cloud2.points[i].iter())
+            .map(|(a, b)| (a - b).powi(2))
+            .sum::<f64>()
+            .sqrt();
         max_min_12 = max_min_12.max(d);
         max_min_21 = max_min_21.max(d);
     }
@@ -118,12 +134,18 @@ mod tests {
     #[test]
     fn test_perturbation_is_bounded() {
         let cloud = PointCloud::from_points(vec![
-            vec![0.0, 0.0], vec![1.0, 0.0], vec![0.0, 1.0],
-            vec![1.0, 1.0], vec![0.5, 0.5],
+            vec![0.0, 0.0],
+            vec![1.0, 0.0],
+            vec![0.0, 1.0],
+            vec![1.0, 1.0],
+            vec![0.5, 0.5],
         ]);
         let result = check_stability(&cloud, 0.01, 1, 5.0, 42);
-        assert!(result.is_stable,
-            "stability violated: bottleneck {} > bound {}", result.bottleneck_distance, result.theoretical_bound);
+        assert!(
+            result.is_stable,
+            "stability violated: bottleneck {} > bound {}",
+            result.bottleneck_distance, result.theoretical_bound
+        );
     }
 
     #[test]
@@ -136,8 +158,11 @@ mod tests {
         let cloud = PointCloud::from_points(points);
         let result = check_stability(&cloud, 0.05, 1, 5.0, 123);
         // Bottleneck should be small for small perturbation
-        assert!(result.bottleneck_distance < 1.0,
-            "bottleneck too large for small perturbation: {}", result.bottleneck_distance);
+        assert!(
+            result.bottleneck_distance < 1.0,
+            "bottleneck too large for small perturbation: {}",
+            result.bottleneck_distance
+        );
     }
 
     #[test]

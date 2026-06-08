@@ -5,14 +5,17 @@
 //! This library constructs sparse topological skeletons from landmark agents and uses
 //! persistent homology to detect fleet behavioral regimes.
 
-pub mod landmark;
-pub mod witness_complex;
-pub mod persistence;
-pub mod bottleneck;
-pub mod mapper;
-pub mod stability;
+// Pre-existing numeric code triggers several clippy pedantic lints.
+#![allow(clippy::needless_range_loop, clippy::ptr_arg, clippy::let_and_return)]
 
-use serde::{Serialize, Deserialize};
+pub mod bottleneck;
+pub mod landmark;
+pub mod mapper;
+pub mod persistence;
+pub mod stability;
+pub mod witness_complex;
+
+use serde::{Deserialize, Serialize};
 
 /// A point cloud with optional labels for each point.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -24,7 +27,11 @@ pub struct PointCloud {
 impl PointCloud {
     /// Create a new point cloud from points and labels.
     pub fn new(points: Vec<Vec<f64>>, labels: Vec<String>) -> Self {
-        assert_eq!(points.len(), labels.len(), "points and labels must have same length");
+        assert_eq!(
+            points.len(),
+            labels.len(),
+            "points and labels must have same length"
+        );
         Self { points, labels }
     }
 
@@ -53,7 +60,11 @@ impl PointCloud {
     pub fn distance(&self, i: usize, j: usize) -> f64 {
         let a = &self.points[i];
         let b = &self.points[j];
-        a.iter().zip(b.iter()).map(|(x, y)| (x - y).powi(2)).sum::<f64>().sqrt()
+        a.iter()
+            .zip(b.iter())
+            .map(|(x, y)| (x - y).powi(2))
+            .sum::<f64>()
+            .sqrt()
     }
 
     /// Full distance matrix.
@@ -80,7 +91,10 @@ pub struct LandmarkSet {
 
 impl LandmarkSet {
     pub fn new(indices: Vec<usize>, method: impl Into<String>) -> Self {
-        Self { indices, selection_method: method.into() }
+        Self {
+            indices,
+            selection_method: method.into(),
+        }
     }
 
     pub fn len(&self) -> usize {
@@ -101,7 +115,10 @@ pub struct WitnessComplex {
 
 impl WitnessComplex {
     pub fn new(simplices: Vec<Vec<usize>>, dimension: usize) -> Self {
-        Self { simplices, dimension }
+        Self {
+            simplices,
+            dimension,
+        }
     }
 
     /// Number of simplices.
@@ -120,7 +137,9 @@ impl WitnessComplex {
 
     /// Return all vertices (0-simplices).
     pub fn vertices(&self) -> Vec<usize> {
-        let mut verts: Vec<usize> = self.simplices.iter()
+        let mut verts: Vec<usize> = self
+            .simplices
+            .iter()
             .filter(|s| s.len() == 1)
             .map(|s| s[0])
             .collect();
@@ -131,7 +150,8 @@ impl WitnessComplex {
 
     /// Return all edges (1-simplices).
     pub fn edges(&self) -> Vec<(usize, usize)> {
-        self.simplices.iter()
+        self.simplices
+            .iter()
             .filter(|s| s.len() == 2)
             .map(|s| (s[0].min(s[1]), s[0].max(s[1])))
             .collect()
@@ -139,7 +159,8 @@ impl WitnessComplex {
 
     /// Return all triangles (2-simplices).
     pub fn triangles(&self) -> Vec<(usize, usize, usize)> {
-        self.simplices.iter()
+        self.simplices
+            .iter()
             .filter(|s| s.len() == 3)
             .map(|s| {
                 let mut v = s.clone();
@@ -172,7 +193,8 @@ impl PersistenceDiagram {
 
     /// Filter points by homology dimension.
     pub fn filter_dim(&self, dim: usize) -> Vec<(f64, f64)> {
-        self.points.iter()
+        self.points
+            .iter()
             .filter(|(_, _, d)| *d == dim)
             .map(|(b, d, _)| (*b, *d))
             .collect()
@@ -180,7 +202,8 @@ impl PersistenceDiagram {
 
     /// Maximum persistence value.
     pub fn max_persistence(&self) -> f64 {
-        self.points.iter()
+        self.points
+            .iter()
             .map(|(b, d, _)| d - b)
             .fold(0.0_f64, f64::max)
     }

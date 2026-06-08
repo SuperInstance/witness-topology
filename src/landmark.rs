@@ -3,7 +3,7 @@
 //! Provides max-min sampling (farthest-point) and random selection to choose
 //! a sparse set of landmark points from a point cloud.
 
-use crate::{PointCloud, LandmarkSet};
+use crate::{LandmarkSet, PointCloud};
 
 /// Select landmarks using max-min (farthest point) sampling.
 ///
@@ -11,7 +11,11 @@ use crate::{PointCloud, LandmarkSet};
 /// producing a well-spread set of landmarks.
 pub fn max_min_sampling(cloud: &PointCloud, num_landmarks: usize) -> LandmarkSet {
     let n = cloud.len();
-    assert!(num_landmarks <= n && num_landmarks > 0, "num_landmarks must be in 1..={}", n);
+    assert!(
+        num_landmarks <= n && num_landmarks > 0,
+        "num_landmarks must be in 1..={}",
+        n
+    );
 
     if num_landmarks == n {
         return LandmarkSet::new((0..n).collect(), "max_min");
@@ -53,13 +57,19 @@ pub fn max_min_sampling(cloud: &PointCloud, num_landmarks: usize) -> LandmarkSet
 /// Uses a simple deterministic shuffle for reproducibility (seeded by input).
 pub fn random_selection(cloud: &PointCloud, num_landmarks: usize, seed: u64) -> LandmarkSet {
     let n = cloud.len();
-    assert!(num_landmarks <= n && num_landmarks > 0, "num_landmarks must be in 1..={}", n);
+    assert!(
+        num_landmarks <= n && num_landmarks > 0,
+        "num_landmarks must be in 1..={}",
+        n
+    );
 
     // Simple LCG-based shuffle
     let mut indices: Vec<usize> = (0..n).collect();
     let mut state = seed.wrapping_add(n as u64);
     for i in (1..n).rev() {
-        state = state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        state = state
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         let j = (state >> 33) as usize % (i + 1);
         indices.swap(i, j);
     }
@@ -74,7 +84,11 @@ pub fn random_selection(cloud: &PointCloud, num_landmarks: usize, seed: u64) -> 
 /// This is an alias for max-min sampling with a random start.
 pub fn greedy_spacing(cloud: &PointCloud, num_landmarks: usize, start: usize) -> LandmarkSet {
     let n = cloud.len();
-    assert!(num_landmarks <= n && num_landmarks > 0, "num_landmarks must be in 1..={}", n);
+    assert!(
+        num_landmarks <= n && num_landmarks > 0,
+        "num_landmarks must be in 1..={}",
+        n
+    );
     assert!(start < n, "start index must be < {}", n);
 
     let mut landmarks = Vec::with_capacity(num_landmarks);
@@ -112,8 +126,11 @@ mod tests {
     #[test]
     fn test_max_min_produces_correct_count() {
         let cloud = PointCloud::from_points(vec![
-            vec![0.0, 0.0], vec![1.0, 0.0], vec![0.0, 1.0],
-            vec![1.0, 1.0], vec![0.5, 0.5],
+            vec![0.0, 0.0],
+            vec![1.0, 0.0],
+            vec![0.0, 1.0],
+            vec![1.0, 1.0],
+            vec![0.5, 0.5],
         ]);
         let lm = max_min_sampling(&cloud, 3);
         assert_eq!(lm.indices.len(), 3);
@@ -124,7 +141,10 @@ mod tests {
     fn test_max_min_produces_diverse_landmarks() {
         // Four corners of a square
         let cloud = PointCloud::from_points(vec![
-            vec![0.0, 0.0], vec![10.0, 0.0], vec![0.0, 10.0], vec![10.0, 10.0],
+            vec![0.0, 0.0],
+            vec![10.0, 0.0],
+            vec![0.0, 10.0],
+            vec![10.0, 10.0],
             vec![5.0, 5.0],
         ]);
         let lm = max_min_sampling(&cloud, 4);
@@ -141,9 +161,7 @@ mod tests {
 
     #[test]
     fn test_random_selection_correct_count() {
-        let cloud = PointCloud::from_points(vec![
-            vec![0.0], vec![1.0], vec![2.0], vec![3.0],
-        ]);
+        let cloud = PointCloud::from_points(vec![vec![0.0], vec![1.0], vec![2.0], vec![3.0]]);
         let lm = random_selection(&cloud, 2, 42);
         assert_eq!(lm.indices.len(), 2);
         assert_eq!(lm.selection_method, "random");
@@ -154,7 +172,10 @@ mod tests {
     #[test]
     fn test_greedy_spacing_with_start() {
         let cloud = PointCloud::from_points(vec![
-            vec![0.0, 0.0], vec![10.0, 0.0], vec![0.0, 10.0], vec![10.0, 10.0],
+            vec![0.0, 0.0],
+            vec![10.0, 0.0],
+            vec![0.0, 10.0],
+            vec![10.0, 10.0],
         ]);
         let lm = greedy_spacing(&cloud, 2, 0);
         assert_eq!(lm.indices.len(), 2);

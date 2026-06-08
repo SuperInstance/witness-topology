@@ -2,7 +2,7 @@
 //!
 //! Implements matching-based distances for comparing topological signatures.
 
-use crate::{PersistenceDiagram, BottleneckDistance};
+use crate::{BottleneckDistance, PersistenceDiagram};
 
 /// Compute the bottleneck distance between two persistence diagrams.
 ///
@@ -13,11 +13,15 @@ use crate::{PersistenceDiagram, BottleneckDistance};
 /// Uses a greedy matching for correctness on small diagrams.
 pub fn bottleneck_distance(d1: &PersistenceDiagram, d2: &PersistenceDiagram) -> BottleneckDistance {
     // Filter to finite points
-    let p1: Vec<(f64, f64, usize)> = d1.points.iter()
+    let p1: Vec<(f64, f64, usize)> = d1
+        .points
+        .iter()
         .filter(|(_b, d, _)| d.is_finite())
         .cloned()
         .collect();
-    let p2: Vec<(f64, f64, usize)> = d2.points.iter()
+    let p2: Vec<(f64, f64, usize)> = d2
+        .points
+        .iter()
         .filter(|(_b, d, _)| d.is_finite())
         .cloned()
         .collect();
@@ -70,11 +74,15 @@ pub fn bottleneck_distance(d1: &PersistenceDiagram, d2: &PersistenceDiagram) -> 
 ///
 /// Uses a greedy nearest-neighbor matching (approximate for large diagrams).
 pub fn wasserstein_distance(d1: &PersistenceDiagram, d2: &PersistenceDiagram, p: f64) -> f64 {
-    let p1: Vec<(f64, f64, usize)> = d1.points.iter()
+    let p1: Vec<(f64, f64, usize)> = d1
+        .points
+        .iter()
         .filter(|(_b, d, _)| d.is_finite())
         .cloned()
         .collect();
-    let p2: Vec<(f64, f64, usize)> = d2.points.iter()
+    let p2: Vec<(f64, f64, usize)> = d2
+        .points
+        .iter()
         .filter(|(_b, d, _)| d.is_finite())
         .cloned()
         .collect();
@@ -140,13 +148,17 @@ fn has_perfect_matching(
     let n2 = p2.len();
 
     // Build adjacency: which p2 points can each p1 point match to
-    let adj: Vec<Vec<usize>> = (0..n1).map(|i| {
-        let (b1, d1, dim1) = &p1[i];
-        (0..n2).filter(|&j| {
-            let (b2, d2, dim2) = &p2[j];
-            dim1 == dim2 && sup_norm(*b1, *d1, *b2, *d2) <= threshold
-        }).collect()
-    }).collect();
+    let adj: Vec<Vec<usize>> = (0..n1)
+        .map(|i| {
+            let (b1, d1, dim1) = &p1[i];
+            (0..n2)
+                .filter(|&j| {
+                    let (b2, d2, dim2) = &p2[j];
+                    dim1 == dim2 && sup_norm(*b1, *d1, *b2, *d2) <= threshold
+                })
+                .collect()
+        })
+        .collect();
 
     // Augmenting path matching
     let mut match_p2: Vec<Option<usize>> = vec![None; n2];
@@ -228,7 +240,11 @@ mod tests {
         let d1 = PersistenceDiagram::new(vec![(0.0, 1.0, 0), (0.5, 2.0, 1)], 1);
         let d2 = PersistenceDiagram::new(vec![(0.0, 1.0, 0), (0.5, 2.0, 1)], 1);
         let bn = bottleneck_distance(&d1, &d2);
-        assert!(bn.value < 1e-10, "identical diagrams should have bottleneck distance 0, got {}", bn.value);
+        assert!(
+            bn.value < 1e-10,
+            "identical diagrams should have bottleneck distance 0, got {}",
+            bn.value
+        );
     }
 
     #[test]
@@ -249,8 +265,14 @@ mod tests {
         let d23 = bottleneck_distance(&d2, &d3).value;
         let d13 = bottleneck_distance(&d1, &d3).value;
 
-        assert!(d13 <= d12 + d23 + 1e-10,
-            "triangle inequality violated: {} > {} + {} = {}", d13, d12, d23, d12 + d23);
+        assert!(
+            d13 <= d12 + d23 + 1e-10,
+            "triangle inequality violated: {} > {} + {} = {}",
+            d13,
+            d12,
+            d23,
+            d12 + d23
+        );
     }
 
     #[test]

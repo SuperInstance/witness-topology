@@ -3,7 +3,7 @@
 //! Implements the standard reduction algorithm (column reduction) to compute
 //! persistence pairs from a filtered simplicial complex.
 
-use crate::{WitnessComplex, PersistenceDiagram};
+use crate::{PersistenceDiagram, WitnessComplex};
 
 /// Compute persistent homology from a witness complex by building a filtration
 /// based on simplices sorted by size (number of vertices), then by lexicographic order.
@@ -17,16 +17,15 @@ pub fn compute_persistence(complex: &WitnessComplex) -> PersistenceDiagram {
     }
 
     // Build filtration: sort by dimension (fewer vertices first), then lexicographically
-    let mut indexed: Vec<(Vec<usize>, usize)> = simplices.iter()
+    let mut indexed: Vec<(Vec<usize>, usize)> = simplices
+        .iter()
         .enumerate()
         .map(|(i, s)| (s.clone(), i))
         .collect();
 
-    indexed.sort_by(|a, b| {
-        match a.0.len().cmp(&b.0.len()) {
-            std::cmp::Ordering::Equal => a.0.cmp(&b.0),
-            other => other,
-        }
+    indexed.sort_by(|a, b| match a.0.len().cmp(&b.0.len()) {
+        std::cmp::Ordering::Equal => a.0.cmp(&b.0),
+        other => other,
     });
 
     let n = indexed.len();
@@ -160,16 +159,21 @@ pub fn rips_persistence(
 
     // Higher simplices via clique completion
     for dim in 2..=max_dim {
-        let edges: Vec<(usize, usize, f64)> = simplices_with_birth.iter()
+        let edges: Vec<(usize, usize, f64)> = simplices_with_birth
+            .iter()
             .filter(|(s, _)| s.len() == 2)
             .map(|(s, b)| (s[0], s[1], *b))
             .collect();
 
         let mut higher: Vec<(Vec<usize>, f64)> = Vec::new();
         for (s1, _b1) in &simplices_with_birth {
-            if s1.len() != dim { continue; }
+            if s1.len() != dim {
+                continue;
+            }
             for &(u, v, _edge_birth) in &edges {
-                if s1.contains(&u) || s1.contains(&v) { continue; }
+                if s1.contains(&u) || s1.contains(&v) {
+                    continue;
+                }
                 // Check if u and v are both connected to all vertices in s1
                 let u_connected = s1.iter().all(|&w| {
                     simplices_with_birth.iter().any(|(s, _)| {
@@ -187,8 +191,10 @@ pub fn rips_persistence(
                     simplex.push(v);
                     simplex.sort();
                     // Birth time = max of all pairwise distances
-                    let birth = simplex.iter().enumerate()
-                        .flat_map(|(i, &a)| simplex[i+1..].iter().map(move |&b| distances[a][b]))
+                    let birth = simplex
+                        .iter()
+                        .enumerate()
+                        .flat_map(|(i, &a)| simplex[i + 1..].iter().map(move |&b| distances[a][b]))
                         .fold(0.0_f64, f64::max);
                     if birth <= max_epsilon {
                         higher.push((simplex, birth));
@@ -200,14 +206,12 @@ pub fn rips_persistence(
     }
 
     // Sort by birth time, then by dimension, then lexicographically
-    simplices_with_birth.sort_by(|a, b| {
-        match a.1.partial_cmp(&b.1).unwrap() {
-            std::cmp::Ordering::Equal => match a.0.len().cmp(&b.0.len()) {
-                std::cmp::Ordering::Equal => a.0.cmp(&b.0),
-                other => other,
-            },
+    simplices_with_birth.sort_by(|a, b| match a.1.partial_cmp(&b.1).unwrap() {
+        std::cmp::Ordering::Equal => match a.0.len().cmp(&b.0.len()) {
+            std::cmp::Ordering::Equal => a.0.cmp(&b.0),
             other => other,
-        }
+        },
+        other => other,
     });
 
     // Deduplicate
@@ -330,10 +334,18 @@ mod tests {
         points.push(vec![10.0, 0.1]);
 
         let dists: Vec<Vec<f64>> = (0..points.len())
-            .map(|i| (0..points.len()).map(|j| {
-                points[i].iter().zip(points[j].iter())
-                    .map(|(a, b): (&f64, &f64)| (a - b).powi(2)).sum::<f64>().sqrt()
-            }).collect())
+            .map(|i| {
+                (0..points.len())
+                    .map(|j| {
+                        points[i]
+                            .iter()
+                            .zip(points[j].iter())
+                            .map(|(a, b): (&f64, &f64)| (a - b).powi(2))
+                            .sum::<f64>()
+                            .sqrt()
+                    })
+                    .collect()
+            })
             .collect();
 
         let pd = rips_persistence(&dists, 2, 5.0);
@@ -398,10 +410,8 @@ mod tests {
     #[test]
     fn test_persistence_from_complex() {
         use crate::WitnessComplex;
-        let complex = WitnessComplex::new(vec![
-            vec![0], vec![1], vec![2],
-            vec![0, 1], vec![1, 2],
-        ], 1);
+        let complex =
+            WitnessComplex::new(vec![vec![0], vec![1], vec![2], vec![0, 1], vec![1, 2]], 1);
         let pd = compute_persistence(&complex);
         // Should have some persistence pairs
         assert!(pd.len() > 0);
@@ -409,9 +419,9 @@ mod tests {
 
     #[test]
     fn test_full_pipeline() {
-        use crate::{PointCloud, LandmarkSet};
         use crate::landmark::max_min_sampling;
         use crate::witness_complex::weak_witness_complex;
+        use crate::{LandmarkSet, PointCloud};
 
         // Circle of points
         let mut points = Vec::new();

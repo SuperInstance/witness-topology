@@ -3,7 +3,7 @@
 //! Builds weak and strong witness complexes by identifying which data points
 //! "witness" simplices on the landmark set.
 
-use crate::{PointCloud, LandmarkSet, WitnessComplex};
+use crate::{LandmarkSet, PointCloud, WitnessComplex};
 
 /// Build a weak witness complex.
 ///
@@ -29,9 +29,7 @@ pub fn weak_witness_complex(
 
     // For each point, find k nearest landmarks and add subsets
     for p in 0..cloud.len() {
-        let mut dists: Vec<(usize, f64)> = lm.iter()
-            .map(|&l| (l, cloud.distance(p, l)))
-            .collect();
+        let mut dists: Vec<(usize, f64)> = lm.iter().map(|&l| (l, cloud.distance(p, l))).collect();
         dists.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
 
         let nearest: Vec<usize> = dists.iter().take(k).map(|(l, _)| *l).collect();
@@ -46,7 +44,12 @@ pub fn weak_witness_complex(
         }
     }
 
-    let dim = simplex_set.iter().map(|s| s.len()).max().unwrap_or(1).saturating_sub(1);
+    let dim = simplex_set
+        .iter()
+        .map(|s| s.len())
+        .max()
+        .unwrap_or(1)
+        .saturating_sub(1);
     WitnessComplex::new(simplex_set, dim)
 }
 
@@ -73,9 +76,7 @@ pub fn strong_witness_complex(
     }
 
     for p in 0..cloud.len() {
-        let mut dists: Vec<(usize, f64)> = lm.iter()
-            .map(|&l| (l, cloud.distance(p, l)))
-            .collect();
+        let mut dists: Vec<(usize, f64)> = lm.iter().map(|&l| (l, cloud.distance(p, l))).collect();
         dists.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
 
         let nearest: Vec<usize> = dists.iter().take(k).map(|(l, _)| *l).collect();
@@ -99,7 +100,12 @@ pub fn strong_witness_complex(
         }
     }
 
-    let dim = simplex_set.iter().map(|s| s.len()).max().unwrap_or(1).saturating_sub(1);
+    let dim = simplex_set
+        .iter()
+        .map(|s| s.len())
+        .max()
+        .unwrap_or(1)
+        .saturating_sub(1);
     WitnessComplex::new(simplex_set, dim)
 }
 
@@ -129,7 +135,8 @@ pub fn rips_complex(
 
     // Clique completion up to max_dim
     for dim in 2..=max_dim {
-        let prev_simplices: Vec<Vec<usize>> = simplex_set.iter()
+        let prev_simplices: Vec<Vec<usize>> = simplex_set
+            .iter()
             .filter(|s| s.len() == dim)
             .cloned()
             .collect();
@@ -140,9 +147,9 @@ pub fn rips_complex(
                     continue;
                 }
                 // Check if l is connected to all vertices of simplex
-                let all_connected = simplex.iter().all(|&v| {
-                    simplex_set.contains(&vec![v.min(l), v.max(l)])
-                });
+                let all_connected = simplex
+                    .iter()
+                    .all(|&v| simplex_set.contains(&vec![v.min(l), v.max(l)]));
                 if all_connected {
                     let mut new_simplex = simplex.clone();
                     new_simplex.push(l);
@@ -155,7 +162,12 @@ pub fn rips_complex(
         }
     }
 
-    let dim = simplex_set.iter().map(|s| s.len()).max().unwrap_or(1).saturating_sub(1);
+    let dim = simplex_set
+        .iter()
+        .map(|s| s.len())
+        .max()
+        .unwrap_or(1)
+        .saturating_sub(1);
     WitnessComplex::new(simplex_set, dim)
 }
 
@@ -200,9 +212,7 @@ mod tests {
 
     #[test]
     fn test_weak_witness_has_vertices() {
-        let cloud = PointCloud::from_points(vec![
-            vec![0.0, 0.0], vec![1.0, 0.0], vec![0.0, 1.0],
-        ]);
+        let cloud = PointCloud::from_points(vec![vec![0.0, 0.0], vec![1.0, 0.0], vec![0.0, 1.0]]);
         let lm = max_min_sampling(&cloud, 3);
         let wc = weak_witness_complex(&cloud, &lm, 1, 2);
         assert!(wc.vertices().len() >= 3);
@@ -211,7 +221,10 @@ mod tests {
     #[test]
     fn test_strong_witness_fewer_simplices() {
         let cloud = PointCloud::from_points(vec![
-            vec![0.0, 0.0], vec![1.0, 0.0], vec![0.0, 1.0], vec![1.0, 1.0],
+            vec![0.0, 0.0],
+            vec![1.0, 0.0],
+            vec![0.0, 1.0],
+            vec![1.0, 1.0],
         ]);
         let lm = max_min_sampling(&cloud, 3);
         let weak = weak_witness_complex(&cloud, &lm, 2, 3);
@@ -221,9 +234,7 @@ mod tests {
 
     #[test]
     fn test_rips_complex_edges() {
-        let cloud = PointCloud::from_points(vec![
-            vec![0.0], vec![1.0], vec![5.0],
-        ]);
+        let cloud = PointCloud::from_points(vec![vec![0.0], vec![1.0], vec![5.0]]);
         let lm = LandmarkSet::new(vec![0, 1, 2], "test");
         let rips = rips_complex(&cloud, &lm, 2.0, 1);
         // Only edge (0,1) should be within epsilon=2
