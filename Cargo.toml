@@ -1,6 +1,6 @@
 [package]
 name = "witness-topology"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "Witness complex construction for agent shape reconstruction from samples"
 license = "MIT"
