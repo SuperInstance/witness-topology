@@ -1,0 +1,11 @@
+[package]
+name = "witness-topology"
+version = "0.1.0"
+edition = "2021"
+description = "Witness complex construction for agent shape reconstruction from samples"
+license = "MIT"
+repository = "https://github.com/SuperInstance/witness-topology"
+keywords = ["witness", "topology", "simplicial", "landmark", "reconstruction"]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
