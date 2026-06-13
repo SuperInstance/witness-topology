@@ -1,113 +1,187 @@
 # witness-topology
 
-[![crates.io](https://img.shields.io/crates/v/witness-topology.svg)](https://crates.io/crates/witness-topology)
-[![docs.rs](https://docs.rs/witness-topology/badge.svg)](https://docs.rs/witness-topology)
-[![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+Topological data analysis (TDA) for agent behavior verification using **witness complexes**.
 
-## The Problem
+This Rust library constructs sparse topological skeletons from landmark agents and uses persistent homology to detect fleet behavioral regimes. Built from scratch — no external math dependencies.
 
-You have a high-dimensional point cloud (agent states, sensor readings, word embeddings) and you want to know its topological shape: how many connected components? Any loops? Any voids? The shape tells you about the structure of the data — one cluster = one behavioral mode, a loop = cyclic behavior, two components = bimodal.
+## Overview
 
-The Vietoris-Rips complex is the standard tool: connect all point pairs within distance ε. But for n points, this creates up to O(nᵈ) simplices. For n=10,000 and d=3, that's a trillion simplices. Not happening.
+When monitoring a fleet of agents (or any high-dimensional behavioral data), you need to understand the *shape* of the behavior space. Are agents clustering into distinct regimes? Is there a cyclic behavioral pattern? Are there outliers?
 
-## The Idea: Witness Complexes
+Witness topology provides answers through:
 
-The **witness complex** (de Silva & Carlsson, 2004) solves this by selecting a small set of **landmark points** and letting the remaining **witness points** vote on which landmarks should be connected. A simplex {l₁, l₂, ..., lₖ} is included if some witness point w is simultaneously close to all of those landmarks.
+1. **Landmark selection** — choose representative agents via max-min sampling
+2. **Witness complex construction** — build a sparse approximation of the full topology
+3. **Persistent homology** — compute topological invariants (connected components, loops, voids) across scales
+4. **Diagram distances** — compare behavioral signatures via bottleneck/Wasserstein metrics
+5. **Mapper graphs** — summarize high-dimensional data as intuitive graph structures
+6. **Stability guarantees** — provable bounds on how perturbations affect topological conclusions
 
-This reduces the complex from O(nᵈ) to O(mᵈ) where m << n is the number of landmarks, while provably preserving the topology (under mild sampling conditions — landmarks must be sufficiently dense).
-
-### The analogy
-
-Imagine mapping a city by asking tourists "which landmarks can you see from here?" Each tourist is a witness. If many tourists near landmark A can also see landmark B, then A and B are probably close. The tourist reports reconstruct the city layout without surveying every street.
-
-## How It Works
-
-### Select landmarks
+## Quick Start
 
 ```rust
-use witness_topology::{PointCloud, LandmarkSelector};
+use witness_topology::*;
+use witness_topology::landmark::max_min_sampling;
+use witness_topology::witness_complex::weak_witness_complex;
+use witness_topology::persistence::compute_persistence;
 
-let cloud = PointCloud::from_vectors(&[
+// Create a point cloud from agent behavioral features
+let cloud = PointCloud::from_points(vec![
     vec![0.0, 0.0], vec![1.0, 0.0], vec![0.0, 1.0],
     vec![1.0, 1.0], vec![0.5, 0.5],
-    // ... hundreds more points
 ]);
 
-// MaxMin: iteratively pick the point farthest from all existing landmarks
-// Guarantees good spatial coverage. O(n·m) but worth it.
-let landmarks = LandmarkSelector::maxmin(&cloud, 20);
+// Select landmarks
+let landmarks = max_min_sampling(&cloud, 3);
+
+// Build witness complex
+let complex = weak_witness_complex(&cloud, &landmarks, 2, 3);
+
+// Compute persistent homology
+let diagram = compute_persistence(&complex);
+
+// Inspect topological features
+for (birth, death, dim) in &diagram.points {
+    println!("H{}: born at {:.2}, dies at {:.2}", dim, birth, death);
+}
 ```
 
-Three selection strategies:
-- **Random**: O(m), fast but can cluster landmarks in one region
-- **MaxMin** (recommended): O(n·m), guaranteed coverage — every point is close to some landmark
-- **Density-weighted**: O(n·m), more landmarks in dense regions where detail matters
+## Modules
 
-### Build the witness complex
+### `landmark` — Landmark Selection
+
+Select a sparse set of representative points from the data:
+
+- **`max_min_sampling`** — Farthest-point iteration for maximum diversity
+- **`random_selection`** — Deterministic pseudo-random selection (seeded)
+- **`greedy_spacing`** — Max-min with configurable starting point
 
 ```rust
-use witness_topology::WitnessComplex;
-
-let complex = WitnessComplex::build(&landmarks, &cloud, /* k_nearest */ 3, /* max_dim */ 2);
-println!("{} simplices from {} landmarks + {} witnesses",
-    complex.simplices.len(), landmarks.len(), cloud.len());
+let landmarks = max_min_sampling(&cloud, 10);
 ```
 
-### Compute Betti numbers
+### `witness_complex` — Witness Complex Construction
+
+Build simplicial complexes from landmark-witness relationships:
+
+- **`weak_witness_complex`** — Points witness simplices of their k-nearest landmarks
+- **`strong_witness_complex`** — Stricter witnessing condition (fewer simplices)
+- **`rips_complex`** — Full Vietoris-Rips on landmarks (for comparison)
+
+Witness complexes are dramatically sparser than full Rips complexes while preserving topology.
+
+### `persistence` — Persistent Homology
+
+Compute topological features at all scales via boundary matrix reduction:
+
+- **`compute_persistence`** — From any witness complex (filtration by dimension)
+- **`rips_persistence`** — Distance-based Vietoris-Rips filtration with epsilon threshold
+
+The algorithm implements standard column reduction over ℤ/2 without external dependencies.
 
 ```rust
-use witness_topology::TopologyExtractor;
-
-let topo = TopologyExtractor::from_complex(&complex);
-println!("β₀ = {} (connected components)", topo.betti(0));
-println!("β₁ = {} (loops)", topo.betti(1));
-println!("β₂ = {} (voids)", topo.betti(2));
-println!("Euler characteristic χ = {}", topo.euler_characteristic());
+let pd = rips_persistence(&distance_matrix, 2, 5.0);
+let h0 = pd.filter_dim(0); // Connected components
+let h1 = pd.filter_dim(1); // Loops
 ```
 
-Verified against known shapes: single point (β₀=1), hollow triangle (β₁=1), solid tetrahedron (β₀=1), figure-eight (β₁=2).
+### `bottleneck` — Diagram Distances
 
-### Nerve construction (alternative approach)
+Compare persistence diagrams:
 
-The **nerve** of a cover connects overlapping sets. By the Nerve Theorem, it recovers the correct topology:
+- **`bottleneck_distance`** — ∞-norm optimal matching (binary search + augmenting paths)
+- **`wasserstein_distance`** — p-norm matching (greedy approximation)
+
+Both satisfy the triangle inequality. Bottleneck distance between identical diagrams is exactly 0.
 
 ```rust
-use witness_topology::nerve::NerveConstruction;
-
-let nerve = NerveConstruction::from_balls(&cloud, /* radius */ 0.5);
-println!("β₀={}, β₁={}", nerve.topology().betti(0), nerve.topology().betti(1));
+let d = bottleneck_distance(&pd1, &pd2);
+println!("Bottleneck distance: {:.4}", d.value);
 ```
 
-## When To Use This
+### `mapper` — Mapper Graph
 
-- **Agent behavior profiling**: What shape does an agent's state trajectory have? (steady = point, oscillating = loop, chaotic = high-dimensional)
-- **Data exploration**: How many natural clusters in your data? Any ring-like structures suggesting cyclic processes?
-- **Dimensionality reduction validation**: After t-SNE/UMAP, does the 2D projection preserve the original topology?
-- **Sensor network coverage**: Do your sensors see enough of the space to reconstruct its shape?
+Summarize high-dimensional data as a graph:
 
-## Module Map
+- **`build_mapper_graph`** — Custom filter function with configurable intervals and overlap
+- **`mapper_graph_first_coord`** — Convenience filter on first coordinate
+- **`mapper_graph_norm`** — Convenience filter on L2 norm
 
-| Module | What it does |
-|---|---|
-| `landmark` | `LandmarkSelector` — random, maxmin, density-weighted landmark selection |
-| `witness` | `WitnessComplex` — build from landmarks + witness votes |
-| `complex` | `SimplicialComplex` — face closure, boundary matrices, Euler characteristic |
-| `topology` | `TopologyExtractor` — Betti numbers via Gaussian elimination on boundary matrices |
-| `nerve` | `NerveConstruction` — nerve of a cover, ball-cover builder |
-| `error` | `WitnessError` |
+```rust
+let config = MapperConfig {
+    num_intervals: 10,
+    overlap: 0.3,
+    cluster_epsilon: 0.5,
+};
+let graph = build_mapper_graph(&cloud, |p| p[0], &config);
+println!("Nodes: {}, Components: {}", graph.node_count(), graph.connected_components());
+```
 
-## Design Decisions
+### `stability` — Perturbation Bounds
 
-- **Why witness over Vietoris-Rips?** VR is exact but O(nᵈ). Witness is approximate but O(mᵈ) with m << n. For n > 1000, witness is the only practical choice.
-- **MaxMin as default**: Random landmarks can cluster, missing entire regions. MaxMin guarantees every point is close to at least one landmark. The O(n·m) cost is negligible compared to the O(mᵈ) complex construction.
-- **Betti numbers via Gaussian elimination**: Not the fastest algorithm for huge complexes (PHAT or Ripser are better), but correct and simple. For m < 200 landmarks, it runs in milliseconds.
+Verify that small input changes produce bounded output changes:
 
-## Links
+- **`check_stability`** — Perturb and compare persistence diagrams
+- **`perturb_point_cloud`** — Add controlled noise to data
+- **`hausdorff_distance`** — Measure point cloud distance
 
-- [Documentation](https://docs.rs/witness-topology)
-- [Repository](https://github.com/SuperInstance/witness-topology)
-- [crates.io](https://crates.io/crates/witness-topology)
-- de Silva & Carlsson (2004) — *Topological estimation using witness complexes*
+The stability theorem guarantees: d_B(Dgm(f), Dgm(g)) ≤ 2 · d_∞(f, g)
+
+## Core Types
+
+| Type | Description |
+|------|-------------|
+| `PointCloud` | Points with optional labels, distance computation |
+| `LandmarkSet` | Selected landmark indices with method metadata |
+| `WitnessComplex` | Simplices on landmark vertices |
+| `PersistenceDiagram` | (birth, death, dimension) triples |
+| `BottleneckDistance` | Wrapped distance value |
+| `MapperGraph` | Nodes (point clusters) and edges (overlap) |
+
+All public types derive `Serialize` and `Deserialize` via serde.
+
+## Testing
+
+38 tests covering all modules:
+
+```bash
+cargo test
+```
+
+Key test scenarios:
+- Max-min landmark selection produces diverse landmarks
+- Two disconnected clusters → H₀ = 2
+- Circle of points → H₁ features detected
+- Bottleneck distance between identical diagrams = 0
+- Triangle inequality satisfied
+- Stability: perturbed diagrams bounded by perturbation size
+- Witness complex sparser than full Rips
+- Full pipeline: cloud → landmarks → complex → persistence
+
+## Architecture
+
+```
+src/
+├── lib.rs              # Core types (PointCloud, LandmarkSet, etc.)
+├── landmark.rs         # Landmark selection strategies
+├── witness_complex.rs  # Weak/strong witness + Rips construction
+├── persistence.rs      # Boundary matrix reduction
+├── bottleneck.rs       # Bottleneck & Wasserstein distances
+├── mapper.rs           # Mapper graph algorithm
+└── stability.rs        # Perturbation bounds & verification
+```
+
+## Use Cases
+
+- **Agent fleet monitoring** — Detect behavioral regime changes via topology shifts
+- **Anomaly detection** — Outliers appear as topological features
+- **Behavioral clustering** — Mapper graphs reveal natural groupings
+- **Regime transitions** — Persistent homology detects phase changes
+- **Comparison** — Bottleneck distances quantify behavioral similarity
+
+## Performance
+
+Witness complexes are O(n·k) where n is the number of data points and k is the number of landmarks, compared to O(n³) for full Rips complexes. This makes topological analysis feasible for large agent fleets.
 
 ## License
 
